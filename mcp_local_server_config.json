@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcp_math_tools": {
+      "command": "uv",
+      "args": ["run", "mcp_local_server.py"]
+    }
+  }
+}
