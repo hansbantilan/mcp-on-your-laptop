@@ -155,6 +155,7 @@ dependencies = [
     { name = "mcp", extra = ["cli"] },
     { name = "nest-asyncio" },
     { name = "ollama" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -162,6 +163,7 @@ requires-dist = [
     { name = "mcp", extras = ["cli"], specifier = ">=1.9.2" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "ollama", specifier = ">=0.5.1" },
+    { name = "rich", specifier = ">=14.0.0" },
 ]
 
 [[package]]

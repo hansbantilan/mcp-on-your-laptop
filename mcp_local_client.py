@@ -1,10 +1,17 @@
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from contextlib import AsyncExitStack
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.spinner import Spinner
+
 import json
 import asyncio
 import nest_asyncio
 import ollama
+
 
 
 nest_asyncio.apply()
@@ -18,6 +25,8 @@ class MCP_ChatBot:
         self.available_prompts = []
         # Sessions dict maps tool/prompt names or resource URIs to MCP client sessions
         self.sessions = {}
+        # Rich console
+        self.console = Console()
 
     async def connect_to_server(self, server_name, server_config):
         try:
@@ -67,10 +76,10 @@ class MCP_ChatBot:
                         self.sessions[resource_uri] = session
             
             except Exception as e:
-                print(f"Error {e}")
+                self.console.print(f"Error {e}")
                 
         except Exception as e:
-            print(f"Error connecting to {server_name}: {e}")
+            self.console.print(f"Error connecting to {server_name}: {e}")
 
     async def connect_to_servers(self):
         try:
@@ -80,12 +89,12 @@ class MCP_ChatBot:
             for server_name, server_config in servers.items():
                 await self.connect_to_server(server_name, server_config)
         except Exception as e:
-            print(f"Error loading server config: {e}")
+            self.console.print(f"Error loading server config: {e}")
             raise
     
     async def process_query(self, query):
         messages = [{'role':'user', 'content':query}]
-        #print(f"Tools Available\n {json.dumps(self.available_tools, indent=4)}")
+        #self.console.print(f"Tools Available\n {json.dumps(self.available_tools, indent=4)}")
 
         while True:
             response = ollama.chat(
@@ -97,7 +106,7 @@ class MCP_ChatBot:
             assistant_content = []
             has_tool_use = False
 
-            print(response.message.content)
+            self.console.print(response.message.content)
             assistant_content.append(response.message.content)
 
             for tool in response.message.tool_calls or []:
@@ -108,10 +117,10 @@ class MCP_ChatBot:
                 })
 
                 # Get session and call tool
-                print(f"Tool Selected: {tool.function}")
+                self.console.print(f"\n[bold green]Tool Call:[/bold green] {tool.function}\n")
                 session = self.sessions.get(tool.function.name)
                 if not session:
-                    print(f"Tool '{tool.function.name}' not found.")
+                    self.console.print(f"Tool '{tool.function.name}' not found.")
                     break
                     
                 result = await session.call_tool(tool.function.name, arguments=tool.function.arguments)
@@ -119,7 +128,7 @@ class MCP_ChatBot:
                 tool_output = []
                 for content in result.content:
                     tool_output.append(content.text)
-                print(f"Tool Output: {tool_output}")
+                self.console.print(f"\n[bold magenta]Tool Output:[/bold magenta] {tool_output}\n")
          
                 messages.append({
                     "role": "tool", 
@@ -141,40 +150,40 @@ class MCP_ChatBot:
                     break
             
         if not session:
-            print(f"Resource '{resource_uri}' not found.")
+            self.console.print(f"Resource '{resource_uri}' not found.")
             return
         
         try:
             result = await session.read_resource(uri=resource_uri)
             if result and result.contents:
-                print(f"\nResource: {resource_uri}")
-                print("Content:")
-                print(result.contents[0].text)
+                self.console.print(f"\nResource: {resource_uri}")
+                self.console.print("Content:")
+                self.console.print(result.contents[0].text)
             else:
-                print("No content available.")
+                self.console.print("No content available.")
         except Exception as e:
-            print(f"Error: {e}")
+            self.console.print(f"Error: {e}")
     
     async def list_prompts(self):
         """List all available prompts."""
         if not self.available_prompts:
-            print("No prompts available.")
+            self.console.print("No prompts available.")
             return
         
-        print("\nAvailable prompts:")
+        self.console.print("\nAvailable prompts:")
         for prompt in self.available_prompts:
-            print(f"- {prompt['name']}: {prompt['description']}")
+            self.console.print(f"- {prompt['name']}: {prompt['description']}")
             if prompt['arguments']:
-                print(f"  Arguments:")
+                self.console.print(f"  Arguments:")
                 for arg in prompt['arguments']:
                     arg_name = arg.name if hasattr(arg, 'name') else arg.get('name', '')
-                    print(f"    - {arg_name}")
+                    self.console.print(f"    - {arg_name}")
     
     async def execute_prompt(self, prompt_name, args):
         """Execute a prompt with the given arguments."""
         session = self.sessions.get(prompt_name)
         if not session:
-            print(f"Prompt '{prompt_name}' not found.")
+            self.console.print(f"Prompt '{prompt_name}' not found.")
             return
         
         try:
@@ -192,14 +201,14 @@ class MCP_ChatBot:
                     text = " ".join(item.text if hasattr(item, 'text') else str(item) 
                                   for item in prompt_content)
                 
-                print(f"\nExecuting prompt '{prompt_name}'...")
+                self.console.print(f"\nExecuting prompt '{prompt_name}'...")
                 await self.process_query(text)
         except Exception as e:
-            print(f"Error: {e}")
+            self.console.print(f"Error: {e}")
     
     async def chat_loop(self):
-        print("\nMCP Chatbot Started!")
-        print("Type your queries or 'quit' to exit.")
+        self.console.print(Panel.fit("Local MCP Client Started!", padding=(1,4)))
+        self.console.print("Type your queries or 'quit' to exit.")
         
         while True:
             try:
@@ -213,7 +222,7 @@ class MCP_ChatBot:
                 await self.process_query(query)
                     
             except Exception as e:
-                print(f"\nError: {str(e)}")
+                self.console.print(f"\nError: {str(e)}")
     
     async def cleanup(self):
         await self.exit_stack.aclose()

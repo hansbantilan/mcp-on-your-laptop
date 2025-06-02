@@ -8,4 +8,5 @@ dependencies = [
     "mcp[cli]>=1.9.2",
     "nest-asyncio>=1.6.0",
     "ollama>=0.5.1",
+    "rich>=14.0.0",
 ]
